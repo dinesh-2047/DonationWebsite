@@ -1,14 +1,26 @@
-# Step 1: Use official lightweight Java 17 image
-FROM eclipse-temurin:17-jdk-alpine
-
-# Step 2: Set working directory inside container
+# ---- Stage 1: Build the JAR ----
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Step 3: Volume for temporary files
-VOLUME /tmp
+# Copy pom.xml and download dependencies first (to cache layers)
+COPY pom.xml .
+COPY mvnw .
+COPY .mvn .mvn
+RUN ./mvnw dependency:go-offline -B
 
-# Step 4: Copy the jar from target folder into container
-COPY target/*.jar app.jar
+# Copy source code and build
+COPY src ./src
+RUN ./mvnw clean package -DskipTests
 
-# Step 5: Run Spring Boot app
+# ---- Stage 2: Run the JAR ----
+FROM eclipse-temurin:17-jdk-alpine
+WORKDIR /app
+
+# Copy jar from build stage
+COPY --from=build /app/target/*.jar app.jar
+
+# Render provides $PORT, so expose it
+EXPOSE 8080
+
+# Start the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
