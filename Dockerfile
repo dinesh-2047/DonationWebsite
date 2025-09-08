@@ -2,14 +2,18 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy pom.xml and download dependencies first (to cache layers)
+# Copy Maven wrapper + pom.xml
 COPY pom.xml .
 COPY mvnw .
-COPY .mvn .mvn
+COPY wrapper ./wrapper
+
+# Download dependencies
 RUN ./mvnw dependency:go-offline -B
 
-# Copy source code and build
+# Copy source code
 COPY src ./src
+
+# Build jar
 RUN ./mvnw clean package -DskipTests
 
 # ---- Stage 2: Run the JAR ----
@@ -19,8 +23,7 @@ WORKDIR /app
 # Copy jar from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Render provides $PORT, so expose it
+# Render uses $PORT env var
 EXPOSE 8080
 
-# Start the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
